@@ -1,0 +1,250 @@
+<div id="PodcastsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+    <div data-role="content">
+        <div class="content-primary">
+            <h1>Tilapia</h1>
+            <div class="paperList" style="padding:1em;margin:1em 0">
+                <strong>Feed manager for every user</strong>
+                <div class="fieldDescription" style="margin:.35em 0 .75em">Users do not need Dashboard access. Open the Tilapia manager in any browser, including a phone or tablet.</div>
+                <a is="emby-button" class="raised button-submit emby-button" href="../Tilapia" target="_blank" rel="noopener"><span>Open Tilapia Podcast Manager</span></a>
+            </div>
+            <p>Manage the public podcast feeds available to the Jellyfin account currently signed in. They appear in Jellyfin under <strong>Channels → Podcasts</strong>.</p>
+
+            <div class="paperList" style="padding:1em;margin:1em 0">
+                <strong>One-time administrator step</strong>
+                <div class="fieldDescription" style="margin-top:.35em">Every listener must be granted access under Dashboard → Users → Access → Channels. Administrator status alone does not automatically grant channel access.</div>
+            </div>
+
+            <h2>Add a public podcast</h2>
+            <form id="PodcastsPreviewForm">
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="PodcastFeedUrl">Podcast RSS or Atom feed URL</label>
+                    <input is="emby-input" id="PodcastFeedUrl" type="url" required inputmode="url" placeholder="https://example.com/feed.xml" autocomplete="off" />
+                    <div class="fieldDescription">Public feeds are recommended. Provider-dependent private RSS testing is available through the Tilapia Podcast Manager above.</div>
+                </div>
+                <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Check feed</span></button>
+            </form>
+
+            <section id="PodcastPreview" class="hide paperList" style="padding:1em;margin:1em 0">
+                <div style="display:flex;gap:1em;align-items:flex-start">
+                    <img id="PodcastPreviewImage" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:4px;display:none" />
+                    <div style="flex:1;min-width:0">
+                        <h3 id="PodcastPreviewTitle" style="margin:0 0 .35em"></h3>
+                        <div id="PodcastPreviewDescription" class="fieldDescription"></div>
+                        <div id="PodcastPreviewCount" style="margin-top:.5em"></div>
+                    </div>
+                </div>
+                <form id="PodcastsAddForm" style="margin-top:1em">
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="PodcastPlaybackMode">Playback</label>
+                        <select is="emby-select" id="PodcastPlaybackMode">
+                            <option value="Stream">Stream — play directly without using server storage</option>
+                            <option value="Cache">Cache — save an episode when it is first played</option>
+                        </select>
+                        <div class="fieldDescription">Stream is recommended. Changing this later does not delete episodes already cached.</div>
+                    </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Add to Podcasts</span></button>
+                </form>
+            </section>
+
+            <div id="PodcastsStatus" role="status" aria-live="polite" style="margin:1.5em 0"></div>
+
+            <h2>Your subscriptions</h2>
+            <div id="PodcastsEmpty" class="fieldDescription">No public podcast feeds have been added for this account.</div>
+            <div id="PodcastsList"></div>
+        </div>
+    </div>
+
+    <template id="PodcastSubscriptionTemplate">
+        <div class="paperList" style="padding:1em;margin:.75em 0;display:flex;gap:1em;align-items:flex-start;flex-wrap:wrap">
+            <img class="podcastImage" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:4px;display:none" />
+            <div style="flex:1;min-width:16em">
+                <h3 class="podcastTitle" style="margin:0 0 .35em"></h3>
+                <div class="podcastDescription fieldDescription"></div>
+                <div class="podcastFeedUrl fieldDescription" style="margin-top:.35em;overflow-wrap:anywhere"></div>
+                <div class="selectContainer" style="margin-top:.75em">
+                    <label class="selectLabel">Playback</label>
+                    <select is="emby-select" class="podcastMode">
+                        <option value="Stream">Stream — no server storage</option>
+                        <option value="Cache">Cache when first played</option>
+                    </select>
+                </div>
+                <button is="emby-button" type="button" class="raised button-submit podcastSaveMode"><span>Save playback change</span></button>
+            </div>
+            <button is="emby-button" type="button" class="raised button-cancel podcastRemove"><span>Remove</span></button>
+        </div>
+    </template>
+
+    <script type="text/javascript">
+        (function () {
+            const page = document.querySelector('#PodcastsConfigPage');
+            const previewForm = page.querySelector('#PodcastsPreviewForm');
+            const addForm = page.querySelector('#PodcastsAddForm');
+            const preview = page.querySelector('#PodcastPreview');
+            const status = page.querySelector('#PodcastsStatus');
+            const list = page.querySelector('#PodcastsList');
+            const empty = page.querySelector('#PodcastsEmpty');
+            const template = page.querySelector('#PodcastSubscriptionTemplate');
+            let checkedFeedUrl = null;
+
+            async function request(path, options) {
+                options = options || {};
+                options.url = ApiClient.getUrl(path);
+                options.type = options.method || 'GET';
+                if (options.body) {
+                    options.data = options.body;
+                    options.contentType = 'application/json';
+                }
+                const response = await ApiClient.ajax(options);
+                if (response && typeof response.json === 'function') {
+                    if (response.status === 204) return null;
+                    return response.json();
+                }
+                if (typeof response === 'string' && response.length) return JSON.parse(response);
+                return response;
+            }
+
+            function value(object, camelName, pascalName) {
+                return object && (object[camelName] !== undefined ? object[camelName] : object[pascalName]);
+            }
+
+            function setStatus(message, isError) {
+                status.textContent = message || '';
+                status.style.color = isError ? '#cc3333' : '';
+            }
+
+            async function errorMessage(error) {
+                try {
+                    if (error && typeof error.json === 'function') {
+                        const body = await error.json();
+                        if (body && body.error) return body.error;
+                    }
+                    if (error && error.response && typeof error.response.json === 'function') {
+                        const body = await error.response.json();
+                        if (body && body.error) return body.error;
+                    }
+                } catch (_) { /* fall through */ }
+                if (error && error.responseJSON && error.responseJSON.error) return error.responseJSON.error;
+                if (error && error.responseText) {
+                    try {
+                        const body = JSON.parse(error.responseText);
+                        if (body.error) return body.error;
+                    } catch (_) { /* not JSON */ }
+                }
+                if (error && error.status) return 'Request failed with HTTP ' + error.status + '.';
+                return 'The request failed. Check the Jellyfin server log for details.';
+            }
+
+            function hidePreview() {
+                checkedFeedUrl = null;
+                preview.classList.add('hide');
+            }
+
+            function showPreview(result) {
+                const feed = value(result, 'feed', 'Feed');
+                checkedFeedUrl = value(result, 'feedUrl', 'FeedUrl');
+                page.querySelector('#PodcastPreviewTitle').textContent = value(feed, 'title', 'Title');
+                page.querySelector('#PodcastPreviewDescription').textContent = value(feed, 'description', 'Description') || checkedFeedUrl;
+                const episodeCount = value(result, 'episodeCount', 'EpisodeCount') || 0;
+                page.querySelector('#PodcastPreviewCount').textContent = episodeCount + (episodeCount === 1 ? ' episode available' : ' episodes available');
+                const image = page.querySelector('#PodcastPreviewImage');
+                const imageUrl = value(feed, 'imageUrl', 'ImageUrl');
+                image.style.display = imageUrl ? '' : 'none';
+                if (imageUrl) image.src = imageUrl;
+                preview.classList.remove('hide');
+            }
+
+            function render(items) {
+                list.replaceChildren();
+                empty.style.display = items.length ? 'none' : '';
+                items.forEach(function (item) {
+                    const node = template.content.cloneNode(true);
+                    const subscription = value(item, 'subscription', 'Subscription');
+                    const feed = value(item, 'feed', 'Feed');
+                    const title = value(feed, 'title', 'Title');
+                    const description = value(feed, 'description', 'Description');
+                    const imageUrl = value(feed, 'imageUrl', 'ImageUrl');
+                    const feedUrl = value(subscription, 'feedUrl', 'FeedUrl');
+                    const mode = value(subscription, 'mode', 'Mode');
+                    const subscriptionId = value(subscription, 'id', 'Id');
+                    node.querySelector('.podcastTitle').textContent = title;
+                    node.querySelector('.podcastDescription').textContent = description || 'No description supplied by this feed.';
+                    node.querySelector('.podcastFeedUrl').textContent = feedUrl;
+                    const modeSelect = node.querySelector('.podcastMode');
+                    modeSelect.value = mode;
+                    const saveButton = node.querySelector('.podcastSaveMode');
+                    saveButton.disabled = true;
+                    modeSelect.addEventListener('change', function () { saveButton.disabled = modeSelect.value === mode; });
+                    saveButton.addEventListener('click', async function () {
+                        saveButton.disabled = true;
+                        setStatus('Saving playback preference…', false);
+                        try {
+                            await request('Podcasts/Subscriptions/' + subscriptionId + '/Mode', {
+                                method: 'PUT', body: JSON.stringify({ mode: modeSelect.value })
+                            });
+                            setStatus('Playback preference saved.', false);
+                            await load();
+                        } catch (error) {
+                            saveButton.disabled = false;
+                            setStatus(await errorMessage(error), true);
+                        }
+                    });
+                    const image = node.querySelector('.podcastImage');
+                    if (imageUrl) { image.src = imageUrl; image.style.display = ''; }
+                    node.querySelector('.podcastRemove').addEventListener('click', async function () {
+                        if (!window.confirm('Remove “' + title + '” from this account? Cached episode files are not automatically deleted.')) return;
+                        setStatus('Removing podcast…', false);
+                        try {
+                            await request('Podcasts/Subscriptions/' + subscriptionId, { method: 'DELETE' });
+                            setStatus('Podcast removed.', false);
+                            await load();
+                        } catch (error) { setStatus(await errorMessage(error), true); }
+                    });
+                    list.appendChild(node);
+                });
+            }
+
+            async function load() {
+                try { render(await request('Podcasts/Subscriptions') || []); }
+                catch (error) { setStatus(await errorMessage(error), true); }
+            }
+
+            page.querySelector('#PodcastFeedUrl').addEventListener('input', hidePreview);
+
+            previewForm.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                const button = previewForm.querySelector('button[type="submit"]');
+                button.disabled = true;
+                hidePreview();
+                setStatus('Checking public feed…', false);
+                try {
+                    showPreview(await request('Podcasts/Feeds/Preview', {
+                        method: 'POST', body: JSON.stringify({ feedUrl: page.querySelector('#PodcastFeedUrl').value.trim() })
+                    }));
+                    setStatus('Feed checked. Review it below before adding.', false);
+                } catch (error) { setStatus(await errorMessage(error), true); }
+                finally { button.disabled = false; }
+            });
+
+            addForm.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                if (!checkedFeedUrl) return;
+                const button = addForm.querySelector('button[type="submit"]');
+                button.disabled = true;
+                setStatus('Adding podcast…', false);
+                try {
+                    await request('Podcasts/Subscriptions', {
+                        method: 'POST', body: JSON.stringify({ feedUrl: checkedFeedUrl, mode: page.querySelector('#PodcastPlaybackMode').value })
+                    });
+                    previewForm.reset();
+                    addForm.reset();
+                    hidePreview();
+                    setStatus('Podcast added. Open Channels → Podcasts to browse it.', false);
+                    await load();
+                } catch (error) { setStatus(await errorMessage(error), true); }
+                finally { button.disabled = false; }
+            });
+
+            page.addEventListener('pageshow', load);
+        }());
+    </script>
+</div>

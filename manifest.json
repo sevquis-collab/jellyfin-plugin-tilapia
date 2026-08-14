@@ -1,0 +1,21 @@
+[
+    {
+        "guid": "f238df10-b186-48b8-9993-cf3bc7c7d988",
+        "name": "Tilapia",
+        "description": "Subscribe to public podcast RSS or Atom feeds and listen through Jellyfin's standard Channels interface. Each Jellyfin user manages their own subscriptions. Compatible private RSS feeds are available experimentally and are cached locally; provider restrictions may prevent them from working.\n",
+        "overview": "Per-user podcasts from public RSS feeds.",
+        "owner": "sevquis-collab",
+        "category": "Channels",
+        "versions": [
+            {
+                "version": "1.0.0.0",
+                "changelog": "Initial public release with per-user subscriptions, newest-first episode browsing, configurable episode limits, streaming or caching, feed artwork, a responsive user manager, and experimental provider-dependent private RSS.\n",
+                "targetAbi": "10.11.5.0",
+                "sourceUrl": "https://github.com/sevquis-collab/jellyfin-plugin-tilapia/releases/download/v1.0.0.0/tilapia_1.0.0.0.zip",
+                "checksum": "b120a79f38fcfd10ba7f66b71f1a7dff",
+                "timestamp": "2026-08-14T10:55:39Z"
+            }
+        ],
+        "imageUrl": "https://raw.githubusercontent.com/sevquis-collab/jellyfin-plugin-tilapia/main/Jellyfin.Plugin.Podcasts/Manager/tilapia-icon.png"
+    }
+]

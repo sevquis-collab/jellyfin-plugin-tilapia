@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a reproducible Tilapia problem.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Tilapia. Remove private feed URLs and access tokens from logs before attaching them.
+  - type: input
+    id: jellyfin
+    attributes:
+      label: Jellyfin Server version
+      placeholder: 10.11.5
+    validations:
+      required: true
+  - type: input
+    id: tilapia
+    attributes:
+      label: Tilapia version
+      placeholder: 1.0.0.0
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client and version
+      placeholder: Jellyfin Web, Android, Android TV, Windows, iOS, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include what you expected and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Select …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant sanitized log lines
+      description: Never include private RSS URLs, tokens, cookies, or credentials.
+      render: shell

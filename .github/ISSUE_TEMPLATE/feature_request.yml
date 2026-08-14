@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a focused improvement to Tilapia.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: What is difficult or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behaviour
+    validations:
+      required: true
+  - type: dropdown
+    id: clients
+    attributes:
+      label: Where should this work?
+      multiple: true
+      options:
+        - Jellyfin Web
+        - Android
+        - Android TV
+        - iOS / iPadOS
+        - Windows / macOS / Linux desktop
+        - Other Jellyfin client

@@ -1,0 +1,12 @@
+bin/
+obj/
+artifacts/
+.tools/
+.vs/
+.vscode/settings.json
+*.user
+*.suo
+*.nupkg
+*.zip
+TestResults/
+coverage/

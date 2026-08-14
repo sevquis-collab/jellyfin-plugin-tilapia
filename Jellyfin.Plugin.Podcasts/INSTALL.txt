@@ -1,0 +1,36 @@
+TILAPIA 1.0.0 - JELLYFIN 10.11.5
+==================================
+
+UPGRADE (recommended)
+
+1. In Jellyfin Dashboard, shut down the server.
+2. Open your Jellyfin plugins folder.
+3. Move the existing Podcasts_* folder OUT of the plugins folder as a backup.
+   Do not leave two Podcasts folders in the plugins folder.
+4. Copy the Podcasts_1.0.0.0 folder from this ZIP into the plugins folder.
+5. Start Jellyfin again.
+
+The plugins-folder location depends on how Jellyfin was installed. Check the
+Jellyfin documentation or your server's Dashboard > Paths page if unsure.
+
+FIRST-TIME SETUP
+
+1. For each listener, open Dashboard > Users > Access > Channels.
+2. Allow Podcasts (or allow all channels), then save.
+3. Give the listener this address:
+   https://YOUR-JELLYFIN-ADDRESS/Tilapia
+4. They can use Quick Connect or their Jellyfin username and password.
+5. Podcasts are played from Channels > Podcasts in Jellyfin.
+
+If Jellyfin uses a Base URL, keep it in the address. Example:
+https://example.com/jellyfin/Tilapia
+
+ROLL BACK
+
+1. Shut down Jellyfin.
+2. Move Podcasts_1.0.0.0 out of the plugins folder.
+3. Put the backup Podcasts folder back.
+4. Start Jellyfin.
+
+Subscriptions and cached episodes are stored separately under Jellyfin's data
+folder, so replacing or removing the plugin does not modify existing libraries.
