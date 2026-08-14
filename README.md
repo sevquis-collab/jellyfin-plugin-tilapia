@@ -22,7 +22,7 @@ Tilapia is an independent community plugin and is not currently an official Jell
 
 | Component | Status |
 | --- | --- |
-| Jellyfin Server 10.11.5 + | Tested |
+| Jellyfin Server 10.11.5 - 10.11.11 | Tested |
 | .NET runtime | .NET 9 |
 | Jellyfin Web | Supported |
 | Jellyfin Android and Windows clients | Channel playback tested |
