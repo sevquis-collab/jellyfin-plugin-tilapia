@@ -19,11 +19,11 @@ public sealed class PodcastChannel : IChannel, IRequiresMediaInfoCallback, IHasC
 
     public string Name => "Podcasts";
     public string Description => "Your podcasts, inside Jellyfin. Public RSS feeds are supported; private feeds depend on the provider.";
-    public string DataVersion => "1.0.0";
-    public string HomePageUrl => "https://jellyfin.org";
+    public string DataVersion => "1.1.0";
+    public string HomePageUrl => "https://github.com/sevquis-collab/jellyfin-plugin-tilapia";
     public ChannelParentalRating ParentalRating => ChannelParentalRating.GeneralAudience;
     public bool IsEnabledFor(string userId) => Guid.TryParse(userId, out _);
-    public string GetCacheKey(string? userId) => $"v100-{userId ?? "anonymous"}-{_store.CacheRevision}";
+    public string GetCacheKey(string? userId) => $"v110-{userId ?? "anonymous"}-{_store.CacheRevision}";
     public IEnumerable<ImageType> GetSupportedChannelImages() => Array.Empty<ImageType>();
     public Task<DynamicImageResponse> GetChannelImage(ImageType type, CancellationToken cancellationToken) => throw new NotSupportedException();
 

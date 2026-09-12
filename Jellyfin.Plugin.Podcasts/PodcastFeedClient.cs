@@ -1,4 +1,5 @@
 using System.Net;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
@@ -14,6 +15,7 @@ public sealed class PodcastFeedClient
     { Timeout = TimeSpan.FromSeconds(20) };
     private readonly PodcastStore _store;
     private readonly Dictionary<string, (DateTimeOffset Time, PodcastFeed Feed)> _feeds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, FeedFetchStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _feedGate = new(1, 1);
     private readonly ILogger<PodcastFeedClient> _logger;
 
@@ -21,7 +23,7 @@ public sealed class PodcastFeedClient
     {
         _store = store;
         _logger = logger;
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tilapia/1.0.0");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tilapia/1.1.0");
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("(Jellyfin-Podcast-Client)");
         _http.DefaultRequestHeaders.Accept.ParseAdd("*/*");
     }
@@ -33,13 +35,37 @@ public sealed class PodcastFeedClient
         try
         {
             if (_feeds.TryGetValue(url, out cached) && DateTimeOffset.UtcNow - cached.Time < TimeSpan.FromMinutes(15)) return cached.Feed;
-            var bytes = await GetBytesSafeAsync(new Uri(url), 0, 5 * 1024 * 1024, token);
-            var feed = Parse(bytes);
-            _feeds[url] = (DateTimeOffset.UtcNow, feed);
-            return feed;
+            var checkedAt = DateTimeOffset.UtcNow;
+            try
+            {
+                var bytes = await GetBytesSafeAsync(new Uri(url), 0, 5 * 1024 * 1024, token);
+                var feed = Parse(bytes);
+                _feeds[url] = (checkedAt, feed);
+                _statuses[url] = new FeedFetchStatus(checkedAt, checkedAt, null);
+                return feed;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or System.Xml.XmlException)
+            {
+                var previousSuccess = _statuses.TryGetValue(url, out var status) ? status.LastSuccessful : null;
+                _statuses[url] = new FeedFetchStatus(checkedAt, previousSuccess, FriendlyFailure(ex));
+                throw;
+            }
         }
         finally { _feedGate.Release(); }
     }
+
+    public FeedFetchStatus? GetStatus(string url)
+        => _statuses.TryGetValue(url, out var status) ? status : null;
+
+    private static string FriendlyFailure(Exception exception)
+        => exception switch
+        {
+            HttpRequestException http when http.StatusCode is not null => $"Feed returned HTTP {(int)http.StatusCode.Value}.",
+            HttpRequestException => "The feed could not be reached.",
+            InvalidDataException => "The response was not a readable podcast feed.",
+            System.Xml.XmlException => "The feed contains invalid XML.",
+            _ => "The feed could not be refreshed."
+        };
 
     public async Task<string> GetCachedEpisodeAsync(string audioUrl, CancellationToken token)
     {

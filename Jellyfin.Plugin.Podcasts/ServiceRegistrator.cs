@@ -12,6 +12,7 @@ public sealed class ServiceRegistrator : IPluginServiceRegistrator
     {
         services.AddSingleton<PodcastStore>();
         services.AddSingleton<PodcastFeedClient>();
+        services.AddSingleton<PodcastDirectoryClient>();
         services.AddSingleton<IChannel, PodcastChannel>();
         services.AddSingleton<MediaBrowser.Model.Tasks.IScheduledTask, PrivateFeedRefreshTask>();
     }
