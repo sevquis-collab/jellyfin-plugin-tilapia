@@ -77,11 +77,12 @@ See [Privacy and data handling](docs/PRIVACY.md) and [Architecture](docs/ARCHITE
 
 ```powershell
 dotnet restore .\Tilapia.sln
-dotnet build .\Tilapia.sln -c Release --no-restore
+dotnet build .\Tilapia.sln -c Release --no-restore -warnaserror
 dotnet test .\Tilapia.sln -c Release --no-build
+snyk test --all-projects --severity-threshold=low --policy-path=.\.snyk
 ```
 
-The plugin references `Jellyfin.Controller` and `Jellyfin.Model` as compile-only dependencies. Jellyfin host assemblies must not be distributed inside the plugin ZIP.
+The build includes the Sonar C# analyzer and treats its findings as errors. The Snyk policy contains one documented, expiring exception for an old Jellyfin server endpoint that Tilapia does not ship or call. The plugin references `Jellyfin.Controller` and `Jellyfin.Model` as compile-only dependencies; Jellyfin host assemblies must not be distributed inside the plugin ZIP.
 
 ## Contributing and security
 

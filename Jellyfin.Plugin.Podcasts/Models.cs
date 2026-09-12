@@ -7,11 +7,11 @@ public sealed record Subscription(Guid Id, Guid UserId, string FeedUrl, Playback
 public sealed record PodcastFeed(string Title, string? Description, string? ImageUrl, IReadOnlyList<PodcastEpisode> Episodes);
 public sealed record PodcastEpisode(string Id, string Title, string? Description, string AudioUrl, string? MimeType, DateTimeOffset? Published, long? Length, long? RuntimeTicks);
 public sealed record PodcastSummary(string Title, string? Description, string? ImageUrl);
-public sealed record AddSubscriptionRequest(string FeedUrl, PlaybackMode Mode, bool IsPrivate = false, int EpisodeLimit = 10, string? SharedWithUserName = null, int RetentionWeeks = 4);
-public sealed record PreviewFeedRequest(string FeedUrl, bool IsPrivate = false);
+public sealed record AddSubscriptionRequest(string FeedUrl, [property: System.Text.Json.Serialization.JsonRequired] PlaybackMode Mode, [property: System.Text.Json.Serialization.JsonRequired] bool IsPrivate = false, [property: System.Text.Json.Serialization.JsonRequired] int EpisodeLimit = 10, string? SharedWithUserName = null, [property: System.Text.Json.Serialization.JsonRequired] int RetentionWeeks = 4);
+public sealed record PreviewFeedRequest(string FeedUrl, [property: System.Text.Json.Serialization.JsonRequired] bool IsPrivate = false);
 public sealed record FeedPreview(string FeedUrl, PodcastSummary Feed, int EpisodeCount);
-public sealed record UpdatePlaybackModeRequest(PlaybackMode Mode);
-public sealed record UpdateEpisodeLimitRequest(int EpisodeLimit);
+public sealed record UpdatePlaybackModeRequest([property: System.Text.Json.Serialization.JsonRequired] PlaybackMode Mode);
+public sealed record UpdateEpisodeLimitRequest([property: System.Text.Json.Serialization.JsonRequired] int EpisodeLimit);
 public sealed record SubscriptionView(Subscription Subscription, PodcastSummary Feed, bool IsAvailable = true, DateTimeOffset? LastChecked = null, string? Error = null);
 public sealed record PodcastDirectoryResult(string FeedUrl, string Title, string? Publisher, string? Description, string? ImageUrl, string? DirectoryUrl, int? EpisodeCount, string? Genre);
 public sealed record ImportOpmlRequest(string Opml);

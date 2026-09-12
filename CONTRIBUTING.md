@@ -11,13 +11,14 @@ Thank you for helping improve Tilapia.
 
 ## Development
 
-Tilapia targets Jellyfin Server 10.11.5 and .NET 9 for the 1.0 release line.
+The current Tilapia line targets Jellyfin Server 12 and .NET 10. The 1.0 release remains available for Jellyfin 10.11.5 through 10.11.11.
 
 ```powershell
 dotnet restore .\Tilapia.sln
-dotnet build .\Tilapia.sln -c Release --no-restore
+dotnet build .\Tilapia.sln -c Release --no-restore -warnaserror
 dotnet test .\Tilapia.sln -c Release --no-build
 node --check .\Jellyfin.Plugin.Podcasts\Manager\manager.js
+snyk test --all-projects --severity-threshold=low --policy-path=.\.snyk
 ```
 
 New parsing or security behaviour should include a focused automated test. Changes that accept external URLs must preserve public-address validation, redirect revalidation, response-size limits and cancellation.

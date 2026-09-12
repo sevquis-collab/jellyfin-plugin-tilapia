@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MediaBrowser.Controller.Library;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Jellyfin.Plugin.Podcasts;
@@ -65,6 +66,7 @@ public sealed class PodcastsController : ControllerBase
     }
 
     [HttpGet("Subscriptions/Opml")]
+    [SuppressMessage("Maintainability", "S3267:Loops should be simplified with LINQ expressions", Justification = "Feed titles are resolved asynchronously and failures are retained in the export.")]
     public async Task<IActionResult> ExportOpml(CancellationToken token)
     {
         var userId = GetUserId();
@@ -74,7 +76,10 @@ public sealed class PodcastsController : ControllerBase
         {
             string? title = null;
             try { title = (await _feeds.GetFeedAsync(subscription.FeedUrl, token)).Title; }
-            catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or System.Xml.XmlException) { }
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or System.Xml.XmlException)
+            {
+                _logger.LogDebug(ex, "Unable to refresh public podcast title during OPML export");
+            }
             feeds.Add(new OpmlFeed(title, subscription.FeedUrl));
         }
 
@@ -102,7 +107,7 @@ public sealed class PodcastsController : ControllerBase
         {
             try
             {
-                var url = await _feeds.NormalizeAndValidateAsync(item.FeedUrl, token);
+                var url = await PodcastFeedClient.NormalizeAndValidateAsync(item.FeedUrl, token);
                 if (existing.Contains(url)) { skipped++; continue; }
                 _ = await _feeds.GetFeedAsync(url, token);
                 await _store.AddAsync(userId, url, PlaybackMode.Stream, false, 10, null, null, 4, token);
@@ -126,7 +131,7 @@ public sealed class PodcastsController : ControllerBase
         _logger.LogInformation("Validating {FeedKind} podcast feed for user {UserId}", request.IsPrivate ? "private" : "public", userId);
         try
         {
-            var url = await _feeds.NormalizeAndValidateAsync(request.FeedUrl, token);
+            var url = await PodcastFeedClient.NormalizeAndValidateAsync(request.FeedUrl, token);
             if (request.IsPrivate && IsPatreon(url))
                 return BadRequest(new { error = "Patreon private RSS is currently unsupported because Patreon rejects its episode media requests. Other standards-based private RSS providers can still be used." });
             var feed = await _feeds.GetFeedAsync(url, token);
@@ -148,7 +153,7 @@ public sealed class PodcastsController : ControllerBase
                 try { await _feeds.RefreshPrivateAsync(subscription, token); }
                 catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or IOException)
                 {
-                    _logger.LogWarning("Private podcast was saved but its first episode could not be downloaded: {Reason}", ex.Message);
+                    _logger.LogWarning(ex, "Private podcast was saved but its first episode could not be downloaded");
                 }
             }
             _logger.LogInformation("Added {FeedKind} podcast feed for user {UserId} in {PlaybackMode} mode", request.IsPrivate ? "private" : "public", userId, mode);
@@ -156,7 +161,7 @@ public sealed class PodcastsController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or System.Xml.XmlException)
         {
-            _logger.LogWarning("Rejected {FeedKind} podcast feed for user {UserId}: {Reason}", request.IsPrivate ? "private" : "public", userId, ex.Message);
+            _logger.LogWarning(ex, "Rejected {FeedKind} podcast feed for user {UserId}", request.IsPrivate ? "private" : "public", userId);
             return BadRequest(new { error = ex.Message });
         }
     }
@@ -167,7 +172,7 @@ public sealed class PodcastsController : ControllerBase
         _ = GetUserId();
         try
         {
-            var url = await _feeds.NormalizeAndValidateAsync(request.FeedUrl, token);
+            var url = await PodcastFeedClient.NormalizeAndValidateAsync(request.FeedUrl, token);
             if (request.IsPrivate && IsPatreon(url))
                 return BadRequest(new { error = "Patreon private RSS is currently unsupported because Patreon rejects its episode media requests. Other standards-based private RSS providers can still be tested." });
             var feed = await _feeds.GetFeedAsync(url, token);

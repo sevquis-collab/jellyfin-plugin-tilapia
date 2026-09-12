@@ -21,7 +21,7 @@ jobs:
       - name: Restore
         run: dotnet restore Tilapia.sln
       - name: Build
-        run: dotnet build Tilapia.sln -c Release --no-restore
+        run: dotnet build Tilapia.sln -c Release --no-restore -warnaserror
       - name: Test
         run: dotnet test Tilapia.sln -c Release --no-build --logger "trx;LogFileName=tests.trx"
       - name: Check manager JavaScript

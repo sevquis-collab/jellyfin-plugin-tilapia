@@ -8,12 +8,12 @@ namespace Jellyfin.Plugin.Podcasts;
 
 public sealed class ServiceRegistrator : IPluginServiceRegistrator
 {
-    public void RegisterServices(IServiceCollection services, IServerApplicationHost applicationHost)
+    public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        services.AddSingleton<PodcastStore>();
-        services.AddSingleton<PodcastFeedClient>();
-        services.AddSingleton<PodcastDirectoryClient>();
-        services.AddSingleton<IChannel, PodcastChannel>();
-        services.AddSingleton<MediaBrowser.Model.Tasks.IScheduledTask, PrivateFeedRefreshTask>();
+        serviceCollection.AddSingleton<PodcastStore>();
+        serviceCollection.AddSingleton<PodcastFeedClient>();
+        serviceCollection.AddSingleton<PodcastDirectoryClient>();
+        serviceCollection.AddSingleton<IChannel, PodcastChannel>();
+        serviceCollection.AddSingleton<MediaBrowser.Model.Tasks.IScheduledTask, PrivateFeedRefreshTask>();
     }
 }

@@ -2,6 +2,7 @@ bin/
 obj/
 artifacts/
 .tools/
+.dotnet-home/
 .vs/
 .vscode/settings.json
 *.user
