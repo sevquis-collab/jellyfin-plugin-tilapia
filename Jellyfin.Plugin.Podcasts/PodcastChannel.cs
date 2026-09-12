@@ -19,11 +19,11 @@ public sealed class PodcastChannel : IChannel, IRequiresMediaInfoCallback, IHasC
 
     public string Name => "Podcasts";
     public string Description => "Your podcasts, inside Jellyfin. Public RSS feeds are supported; private feeds depend on the provider.";
-    public string DataVersion => "1.0.0";
-    public string HomePageUrl => "https://jellyfin.org";
+    public string DataVersion => "1.1.0";
+    public string HomePageUrl => "https://github.com/sevquis-collab/jellyfin-plugin-tilapia";
     public ChannelParentalRating ParentalRating => ChannelParentalRating.GeneralAudience;
     public bool IsEnabledFor(string userId) => Guid.TryParse(userId, out _);
-    public string GetCacheKey(string? userId) => $"v100-{userId ?? "anonymous"}-{_store.CacheRevision}";
+    public string GetCacheKey(string? userId) => $"v110-{userId ?? "anonymous"}-{_store.CacheRevision}";
     public IEnumerable<ImageType> GetSupportedChannelImages() => Array.Empty<ImageType>();
     public Task<DynamicImageResponse> GetChannelImage(ImageType type, CancellationToken cancellationToken) => throw new NotSupportedException();
 
@@ -38,16 +38,16 @@ public sealed class PodcastChannel : IChannel, IRequiresMediaInfoCallback, IHasC
         SupportsContentDownloading = false
     };
 
-    public async Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken token)
+    public async Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken cancellationToken)
     {
-        var subscriptions = (await _store.GetForUserAsync(query.UserId, token)).Where(x => !IsPatreon(x.FeedUrl)).ToArray();
+        var subscriptions = (await _store.GetForUserAsync(query.UserId, cancellationToken)).Where(x => !IsPatreon(x.FeedUrl)).ToArray();
         if (string.IsNullOrWhiteSpace(query.FolderId))
         {
             var folders = new List<ChannelItemInfo>();
             foreach (var subscription in subscriptions)
             {
-                var feed = await _feeds.GetFeedAsync(subscription.FeedUrl, token);
-                folders.Add(new ChannelItemInfo { Id = subscription.Id.ToString("N"), Name = feed.Title, Overview = feed.Description, ImageUrl = await GetArtworkPathAsync(feed.ImageUrl, subscription.IsPrivate, token), Type = ChannelItemType.Folder, FolderType = ChannelFolderType.Container });
+                var feed = await _feeds.GetFeedAsync(subscription.FeedUrl, cancellationToken);
+                folders.Add(new ChannelItemInfo { Id = subscription.Id.ToString("N"), Name = feed.Title, Overview = feed.Description, ImageUrl = await GetArtworkPathAsync(feed.ImageUrl, subscription.IsPrivate, cancellationToken), Type = ChannelItemType.Folder, FolderType = ChannelFolderType.Container });
             }
             return Page(folders, query);
         }
@@ -55,8 +55,8 @@ public sealed class PodcastChannel : IChannel, IRequiresMediaInfoCallback, IHasC
         if (!Guid.TryParse(query.FolderId, out var subscriptionId)) return new ChannelItemResult();
         var selected = subscriptions.FirstOrDefault(x => x.Id == subscriptionId);
         if (selected is null) return new ChannelItemResult();
-        var podcast = await _feeds.GetFeedAsync(selected.FeedUrl, token);
-        var artworkPath = await GetArtworkPathAsync(podcast.ImageUrl, selected.IsPrivate, token);
+        var podcast = await _feeds.GetFeedAsync(selected.FeedUrl, cancellationToken);
+        var artworkPath = await GetArtworkPathAsync(podcast.ImageUrl, selected.IsPrivate, cancellationToken);
         var availableEpisodes = selected.IsPrivate ? podcast.Episodes.Where(x => _feeds.GetPrivateEpisodePath(selected.Id, x) is not null).ToArray() : podcast.Episodes;
         var recentEpisodes = selected.EpisodeLimit == 0
             ? availableEpisodes
@@ -111,18 +111,28 @@ public sealed class PodcastChannel : IChannel, IRequiresMediaInfoCallback, IHasC
         return indexed.Select(x => x.Episode).ToArray();
     }
 
-    public async Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken token)
+    public async Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
     {
         var parts = id.Split(':', 2);
         if (parts.Length != 2 || !Guid.TryParse(parts[0], out var subscriptionId)) return [];
         // Channel callback lacks a user parameter; the opaque id only resolves a subscription and never exposes other feeds in browsing.
         // Search is limited to subscription metadata stored by this plugin, not Jellyfin's database.
-        var subscription = await _store.GetByIdAsync(subscriptionId, token);
+        var subscription = await _store.GetByIdAsync(subscriptionId, cancellationToken);
         if (subscription is null || IsPatreon(subscription.FeedUrl)) return [];
-        var feed = await _feeds.GetFeedAsync(subscription.FeedUrl, token);
+        var feed = await _feeds.GetFeedAsync(subscription.FeedUrl, cancellationToken);
         var episode = feed.Episodes.FirstOrDefault(x => x.Id == parts[1]);
         if (episode is null) return [];
-        var path = subscription.IsPrivate ? _feeds.GetPrivateEpisodePath(subscription.Id, episode) : subscription.Mode == PlaybackMode.Cache ? await _feeds.GetCachedEpisodeAsync(episode.AudioUrl, token) : episode.AudioUrl;
+        string? path;
+        if (subscription.IsPrivate)
+        {
+            path = _feeds.GetPrivateEpisodePath(subscription.Id, episode);
+        }
+        else
+        {
+            path = subscription.Mode == PlaybackMode.Cache
+                ? await _feeds.GetCachedEpisodeAsync(episode.AudioUrl, cancellationToken)
+                : episode.AudioUrl;
+        }
         if (path is null) return [];
         return [CreateSource(path, episode)];
     }

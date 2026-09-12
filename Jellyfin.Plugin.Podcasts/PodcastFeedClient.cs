@@ -1,4 +1,6 @@
 using System.Net;
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
@@ -14,6 +16,7 @@ public sealed class PodcastFeedClient
     { Timeout = TimeSpan.FromSeconds(20) };
     private readonly PodcastStore _store;
     private readonly Dictionary<string, (DateTimeOffset Time, PodcastFeed Feed)> _feeds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, FeedFetchStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _feedGate = new(1, 1);
     private readonly ILogger<PodcastFeedClient> _logger;
 
@@ -21,7 +24,7 @@ public sealed class PodcastFeedClient
     {
         _store = store;
         _logger = logger;
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tilapia/1.0.0");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tilapia/1.1.0");
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("(Jellyfin-Podcast-Client)");
         _http.DefaultRequestHeaders.Accept.ParseAdd("*/*");
     }
@@ -33,13 +36,37 @@ public sealed class PodcastFeedClient
         try
         {
             if (_feeds.TryGetValue(url, out cached) && DateTimeOffset.UtcNow - cached.Time < TimeSpan.FromMinutes(15)) return cached.Feed;
-            var bytes = await GetBytesSafeAsync(new Uri(url), 0, 5 * 1024 * 1024, token);
-            var feed = Parse(bytes);
-            _feeds[url] = (DateTimeOffset.UtcNow, feed);
-            return feed;
+            var checkedAt = DateTimeOffset.UtcNow;
+            try
+            {
+                var bytes = await GetBytesSafeAsync(new Uri(url), 0, 5 * 1024 * 1024, token);
+                var feed = Parse(bytes);
+                _feeds[url] = (checkedAt, feed);
+                _statuses[url] = new FeedFetchStatus(checkedAt, checkedAt, null);
+                return feed;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException or HttpRequestException or System.Xml.XmlException)
+            {
+                var previousSuccess = _statuses.TryGetValue(url, out var status) ? status.LastSuccessful : null;
+                _statuses[url] = new FeedFetchStatus(checkedAt, previousSuccess, FriendlyFailure(ex));
+                throw;
+            }
         }
         finally { _feedGate.Release(); }
     }
+
+    public FeedFetchStatus? GetStatus(string url)
+        => _statuses.TryGetValue(url, out var status) ? status : null;
+
+    private static string FriendlyFailure(Exception exception)
+        => exception switch
+        {
+            HttpRequestException http when http.StatusCode is not null => $"Feed returned HTTP {(int)http.StatusCode.Value}.",
+            HttpRequestException => "The feed could not be reached.",
+            InvalidDataException => "The response was not a readable podcast feed.",
+            System.Xml.XmlException => "The feed contains invalid XML.",
+            _ => "The feed could not be refreshed."
+        };
 
     public async Task<string> GetCachedEpisodeAsync(string audioUrl, CancellationToken token)
     {
@@ -170,7 +197,7 @@ public sealed class PodcastFeedClient
                 if (property.Value.ValueKind == JsonValueKind.String && property.Name is "code" or "title" or "detail" or "message" or "status")
                 {
                     var value = property.Value.GetString() ?? string.Empty;
-                    value = Regex.Replace(value, @"https?://[^\s\""']+", "[URL redacted]", RegexOptions.IgnoreCase);
+                    value = Regex.Replace(value, @"https?://[^\s\""']+", "[URL redacted]", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
                     if (value.Length > 300) value = value[..300] + "...";
                     parts.Add($"{property.Name}={value}");
                 }
@@ -197,7 +224,7 @@ public sealed class PodcastFeedClient
         return path;
     }
 
-    public async Task<string> NormalizeAndValidateAsync(string value, CancellationToken token)
+    public static async Task<string> NormalizeAndValidateAsync(string value, CancellationToken token)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https")) throw new ArgumentException("Only absolute HTTP(S) public feed URLs are allowed.");
         await EnsurePublicHostAsync(uri, token);
@@ -220,7 +247,7 @@ public sealed class PodcastFeedClient
         while ((read = await input.ReadAsync(buffer, token)) > 0)
         {
             if (output.Length + read > maxBytes) throw new HttpRequestException("Remote content exceeds the size limit.");
-            output.Write(buffer, 0, read);
+            await output.WriteAsync(buffer.AsMemory(0, read), token);
         }
         return output.ToArray();
     }
@@ -228,7 +255,7 @@ public sealed class PodcastFeedClient
     private static async Task EnsurePublicHostAsync(Uri uri, CancellationToken token)
     {
         if (!string.IsNullOrEmpty(uri.UserInfo)) throw new ArgumentException("URLs containing credentials are not allowed.");
-        var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, token);
+        var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, token).WaitAsync(TimeSpan.FromSeconds(10), token);
         if (addresses.Length == 0 || addresses.Any(IsPrivateAddress)) throw new ArgumentException("Feed and media hosts must resolve only to public IP addresses.");
     }
 
@@ -260,7 +287,7 @@ public sealed class PodcastFeedClient
             var audio = (string?)enclosure?.Attribute("url") ?? (string?)enclosure?.Attribute("href");
             if (string.IsNullOrWhiteSpace(audio) || !Uri.TryCreate(audio, UriKind.Absolute, out _)) return null;
             var id = Value(e, "guid") ?? Value(e, "id") ?? audio;
-            DateTimeOffset? published = DateTimeOffset.TryParse(Value(e, "pubDate") ?? Value(e, "published") ?? Value(e, "updated"), out var parsed) ? parsed : null;
+            DateTimeOffset? published = DateTimeOffset.TryParse(Value(e, "pubDate") ?? Value(e, "published") ?? Value(e, "updated"), CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var parsed) ? parsed : null;
             long? length = long.TryParse((string?)enclosure?.Attribute("length"), out var len) ? len : null;
             var runtimeTicks = ParseDurationTicks(Value(e, "duration"));
             return new PodcastEpisode(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id))).ToLowerInvariant(), Value(e, "title") ?? $"Episode {index + 1}", Value(e, "description") ?? Value(e, "summary"), audio, (string?)enclosure?.Attribute("type"), published, length, runtimeTicks);

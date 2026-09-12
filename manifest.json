@@ -8,6 +8,14 @@
         "category": "Channels",
         "versions": [
             {
+                "version": "1.1.0.0",
+                "changelog": "Jellyfin 12 release with podcast discovery search, one-click public subscriptions, OPML import and export, subscription health reporting, and a clearer responsive manager. Existing Tilapia data remains compatible.\n",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/sevquis-collab/jellyfin-plugin-tilapia/releases/download/v1.1.0.0/tilapia_1.1.0.0.zip",
+                "checksum": "973bafa4c427e4af6583d0310ad6f850",
+                "timestamp": "2026-09-12T11:52:48Z"
+            },
+            {
                 "version": "1.0.0.0",
                 "changelog": "Initial public release with per-user subscriptions, newest-first episode browsing, configurable episode limits, streaming or caching, feed artwork, a responsive user manager, and experimental provider-dependent private RSS.\n",
                 "targetAbi": "10.11.5.0",

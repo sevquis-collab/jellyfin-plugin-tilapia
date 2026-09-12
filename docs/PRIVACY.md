@@ -24,11 +24,15 @@ Private RSS URLs normally contain credentials. Tilapia protects them at rest usi
 
 ## External requests
 
-Tilapia contacts only the feed, artwork and media hosts selected by users, plus redirect destinations returned by those hosts. Those providers receive the Jellyfin server's public IP address and Tilapia's honest podcast-client User-Agent.
+When a user searches for a podcast, Tilapia sends the search terms and a two-letter country code from the Jellyfin server to Apple's public podcast directory. Apple receives the server's public IP address, while an artwork host may receive the browser's IP address when displaying search-result artwork. Tilapia does not send the user's Jellyfin identity or listening history.
+
+Tilapia also contacts the feed, artwork and media hosts selected by users, plus redirect destinations returned by those hosts. Those providers receive the Jellyfin server's public IP address and Tilapia's honest podcast-client User-Agent.
 
 ## Sharing
 
 Public feed caches may be reused when multiple server users subscribe to the same public URL. Private subscriptions are visible to their owner and may optionally grant playback of locally cached episodes to one additional Jellyfin account.
+
+OPML export contains public subscription URLs only. Private/member feed addresses are excluded because they commonly act as credentials. Imported OPML feeds are validated using the same network protections as feeds added manually.
 
 ## Deletion
 

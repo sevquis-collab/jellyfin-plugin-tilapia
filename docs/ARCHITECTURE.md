@@ -9,7 +9,9 @@ Tilapia uses Jellyfin's Channel API so remote podcasts remain separate from conv
 - `PodcastChannel` presents the authenticated user's subscriptions and episodes through `IChannel` and supplies media information on demand.
 - `PodcastsController` exposes authenticated per-user subscription endpoints.
 - `TilapiaManagerController` serves the same-origin responsive manager and static assets.
+- `PodcastDirectoryClient` performs bounded, cached searches against Apple's public podcast directory. Directory results are never trusted as subscriptions until the normal feed validation path succeeds.
 - `PodcastFeedClient` validates destinations, downloads and parses feeds, and manages artwork/media caches.
+- `OpmlService` parses and exports OPML with DTDs and external XML resolution disabled. Private feed addresses are excluded from export.
 - `PodcastStore` keeps subscriptions in isolated JSON storage and protects private URLs using ASP.NET Core Data Protection.
 - `PrivateFeedRefreshTask` periodically refreshes compatible private subscriptions while skipping unsupported Patreon feeds.
 

@@ -1,0 +1,11 @@
+version: v1.25.0
+ignore:
+  SNYK-DOTNET-JELLYFINCOMMON-3358785:
+    - '*':
+        reason: >-
+          Snyk marks every Jellyfin.Common version as affected by an old server
+          /Repositories advisory. Tilapia references Jellyfin 12 host contracts
+          only, excludes host assemblies from its release ZIP, and does not
+          implement or call Jellyfin's repository-management endpoint.
+        expires: 2026-12-31T00:00:00.000Z
+        created: 2026-09-12T00:00:00.000Z
