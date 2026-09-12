@@ -9,6 +9,7 @@ All notable changes to Tilapia are documented here.
 - Added OPML import and public-subscription export.
 - Added feed availability, last-checked information and manual rechecks.
 - Reworked the responsive manager so direct RSS and private feeds live under Advanced.
+- Updated manager authentication to Jellyfin 12's combined Authorization header.
 - Preserved the existing `podcasts-v01` data location for in-place upgrades.
 
 ## 1.0.0.0 — 2026-08-14

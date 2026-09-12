@@ -9,17 +9,22 @@
   let token = sessionStorage.getItem(tokenKey) || localStorage.getItem(tokenKey) || '';
   let checkedUrl = '', pollTimer, subscriptions = [], searchResults = [];
   const val = (object, camel, pascal) => object?.[camel] ?? object?.[pascal];
-  const authHeader = () => `MediaBrowser Client="Tilapia", Device="Web Browser", DeviceId="${deviceId}", Version="1.1.0"`;
+  const authHeader = () => `MediaBrowser Client="Tilapia", Device="Web Browser", DeviceId="${deviceId}", Version="1.1.0"${token ? `, Token="${token}"` : ''}`;
 
   async function request(path, options = {}, json = true) {
     const headers = new Headers(options.headers || {});
-    headers.set('X-Emby-Authorization', authHeader());
-    if (token) headers.set('X-Emby-Token', token);
+    headers.set('Authorization', authHeader());
     if (options.body) headers.set('Content-Type', 'application/json');
     const response = await fetch(new URL(path, base), { ...options, headers });
     if (!response.ok) {
       let message = `Request failed (${response.status}).`;
-      try { const body = await response.json(); message = body.error || body.title || message; } catch { /* response was not JSON */ }
+      try {
+        const text = await response.text();
+        if (text) {
+          try { const body = JSON.parse(text); message = body.error || body.title || message; }
+          catch { message = text.length <= 300 ? text : message; }
+        }
+      } catch { /* response body was unavailable */ }
       throw new Error(message);
     }
     if (!json || response.status === 204) return response;
